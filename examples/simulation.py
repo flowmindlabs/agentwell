@@ -41,7 +41,7 @@ from examples.simulation_tasks import (
 )
 
 PROXY_URL = os.environ.get("AGENTWELL_PROXY_URL", "http://localhost:3001")
-SLEEP_BETWEEN_CALLS = 2.1
+SLEEP_BETWEEN_CALLS = 3.0   # Groq free tier 30 RPM — 3.0s safe buffer for 4 agents on same account
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
 
