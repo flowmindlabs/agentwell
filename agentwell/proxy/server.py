@@ -27,6 +27,8 @@ from agentwell.guard import (
 install_redactor()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("agentwell")
 
 # Warn on startup if no API key set (OWASP A05 — security misconfiguration)
