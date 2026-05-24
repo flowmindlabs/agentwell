@@ -32,6 +32,7 @@ load_dotenv(override=False)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agentwell.guard.ai_guard import build_agent_system_prompt, sanitize_messages, InputViolation
+from agentwell.utils.compress import compress_messages
 from examples.simulation_tasks import (
     AGENT_A_TASKS,
     AGENT_B_TASKS,
@@ -144,6 +145,9 @@ async def run_agent(agent: dict, day: int, client: httpx.AsyncClient) -> dict:
             results.append({"task_id": task["id"], "global_task_num": global_task_num, "blocked": True, "reason": str(e)})
             await asyncio.sleep(SLEEP_BETWEEN_CALLS)
             continue
+
+        # Compress prompts before sending — strips filler/articles (caveman technique)
+        messages = compress_messages(messages, level="full")
 
         payload = {
             "model": agent["model"],
