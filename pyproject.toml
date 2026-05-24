@@ -7,7 +7,7 @@ name = "agentwell"
 version = "0.1.0"
 description = "Behavioral health layer for AI agents. Agents that work with humans, not around them."
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
     "fastapi==0.115.12",

@@ -5,6 +5,7 @@ import numpy as np
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from sentence_transformers import SentenceTransformer
 from agentwell.config import WINDOW_SIZE
+from agentwell.guard.ai_guard import truncate_for_embed
 
 _model: SentenceTransformer | None = None
 _analyzer = SentimentIntensityAnalyzer()
@@ -36,7 +37,8 @@ def analyze(prompt_text: str, response_text: str, state: DriftState) -> DriftRes
     """Compute drift metrics from prompt + response metadata. No text is stored."""
     model = _get_model()
 
-    prompt_embedding = model.encode(prompt_text, normalize_embeddings=True)
+    # Cap length before embedding — prevents adversarial long inputs poisoning drift scores (LLM08)
+    prompt_embedding = model.encode(truncate_for_embed(prompt_text), normalize_embeddings=True)
     response_sentiment = _analyzer.polarity_scores(response_text)["compound"]
 
     repetition_ratio = 0.0
