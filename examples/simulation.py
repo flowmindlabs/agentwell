@@ -147,7 +147,7 @@ async def run_agent(agent: dict, day: int, client: httpx.AsyncClient) -> dict:
             continue
 
         # Compress prompts before sending — strips filler/articles (caveman technique)
-        messages = compress_messages(messages, level="full")
+        messages = compress_messages(messages, level="ultra")
 
         payload = {
             "model": agent["model"],
