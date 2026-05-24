@@ -178,18 +178,18 @@ def truncate_for_embed(text: str) -> str:
 
 def sanitize_messages(messages: list[dict]) -> list[dict]:
     """
-    Sanitize all user/system message content in a messages array.
-    Assistant messages passed through unchanged — we don't want to block
-    legitimate agent responses, only inbound injection attempts.
-    Returns sanitized messages list. Raises InputViolation if attack found.
+    Sanitize user message content only.
+    System prompts are developer-controlled — not untrusted input.
+    Assistant messages passed through unchanged.
+    Raises InputViolation if injection found in user content.
     """
     cleaned = []
     for msg in messages:
         role = msg.get("role", "")
         content = msg.get("content", "")
 
-        if role in ("user", "system") and isinstance(content, str):
-            content = sanitize_input(content, field_name=f"{role}_message")
+        if role == "user" and isinstance(content, str):
+            content = sanitize_input(content, field_name="user_message")
 
         cleaned.append({**msg, "content": content})
     return cleaned
