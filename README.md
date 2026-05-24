@@ -114,7 +114,7 @@ Sign up at [console.groq.com](https://console.groq.com).
 
 ```env
 AGENTWELL_UPSTREAM=https://api.groq.com/openai
-AGENTWELL_API_KEY=your-groq-key
+GROQ_API_KEY=your-groq-key
 ```
 
 ### Ollama (fully offline — nothing leaves your machine)
@@ -241,22 +241,24 @@ All config via environment variables. System env vars take priority over `.env`.
 
 ## Testing With Simulation
 
-Run 3 sandboxed agents (basic / medium / hard tasks) monitored by agentwell:
+Run 4 sandboxed agents through 3-day behavioral simulation monitored by agentwell:
 
 ```bash
-# Start upstream first (ai-proxy or Ollama)
-# Then start agentwell
+# Terminal 1 — start proxy
 python -m agentwell.proxy.server
 
-# Run simulation
-python examples/simulation.py       # coming in v0.2.0
+# Terminal 2 — run simulation (one command per day)
+python examples/simulation.py --day 1   # Day 1 tasks
+python examples/simulation.py --day 2   # Day 2 tasks
+python examples/simulation.py --day 3   # Day 3 — adversarial batch
 
-# Or run the basic dogfood test now
-python examples/basic_session.py    # 20 repetitive tasks → watch health decline
-python examples/multi_agent.py      # coordination signal detection demo
+# Generate report after each day
+python scripts/daily_report.py
 ```
 
-We are currently running agentwell against our own agents and will publish findings and health reports. See [SPRINT2.md](SPRINT2.md) for the full simulation and EC2 test plan.
+4 agents, 3 days, $0 cost on Groq free tier. Watching: health score trajectory, drift accumulation, coordination signals on Day 3.
+
+See [docs/testing/TESTING_LOG.md](docs/testing/TESTING_LOG.md) for setup log and first test results.
 
 ---
 
@@ -277,14 +279,23 @@ agentwell/
 │   ├── adapters/               # ai-proxy, LiteLLM, openai_compat (auto-detect)
 │   ├── storage/db.py           # SQLite, metadata-only schema
 │   ├── dashboard/app.py        # Streamlit health view
+│   ├── utils/compress.py       # caveman ultra prompt compression
 │   └── config.py               # env var loading (system vars first)
 ├── examples/
+│   ├── simulation.py           # 4-agent 3-day behavioral simulation (--day 1/2/3)
+│   ├── simulation_tasks.py     # full task lists for all 4 agents
 │   ├── basic_session.py        # 20 repetitive tasks dogfood test
 │   └── multi_agent.py          # coordination detection demo
+├── scripts/
+│   ├── ec2_setup.sh            # EC2 bootstrap script
+│   └── daily_report.py         # DB → JSON health report
+├── docs/
+│   ├── WHY_AGENTWELL.md        # problem statement
+│   └── testing/
+│       └── TESTING_LOG.md      # EC2 setup log + test results
 ├── tests/                      # 12 unit tests across all monitor modules
 ├── .env.example
 ├── requirements.txt            # all versions pinned
-├── SPRINT2.md                  # internal roadmap
 └── LICENSE
 ```
 

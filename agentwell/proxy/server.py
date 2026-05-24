@@ -27,6 +27,8 @@ from agentwell.guard import (
 install_redactor()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("agentwell")
 
 # Warn on startup if no API key set (OWASP A05 — security misconfiguration)
@@ -171,11 +173,13 @@ async def chat_completions(request: Request):
         for m in messages
     )
 
-    # Forward to upstream
+    # Forward to upstream — inject Groq key from config if present
     upstream_headers = {
         k: v for k, v in request.headers.items()
         if k.lower() not in ("host", "content-length")
     }
+    if config.GROQ_API_KEY:
+        upstream_headers["authorization"] = f"Bearer {config.GROQ_API_KEY}"
     if _adapter:
         upstream_headers.update(_adapter.extra_request_headers())
 

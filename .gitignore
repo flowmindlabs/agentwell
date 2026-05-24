@@ -44,3 +44,9 @@ Thumbs.db
 # Embeddings cache (can be large)
 .cache/
 sentence_transformers_cache/
+
+# Simulation reports (generated output, not source)
+reports/
+
+# Internal planning docs — team use only
+docs/SPRINT2.md
