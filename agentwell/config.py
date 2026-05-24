@@ -24,6 +24,7 @@ def _get_bool(key: str, default: bool = False) -> bool:
 UPSTREAM_URL: str = _get("AGENTWELL_UPSTREAM", "http://localhost:3030")
 PORT: int = _get_int("AGENTWELL_PORT", 3001)
 API_KEY: str = _get("AGENTWELL_API_KEY", "")
+GROQ_API_KEY: str = _get("GROQ_API_KEY", "")
 HEALTH_THRESHOLD: int = _get_int("AGENTWELL_HEALTH_THRESHOLD", 70)
 WINDOW_SIZE: int = _get_int("AGENTWELL_WINDOW_SIZE", 20)
 DB_PATH: str = _get("AGENTWELL_DB_PATH", "./agentwell.db")
