@@ -5,9 +5,11 @@ import secrets
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from collections import defaultdict
 
 import httpx
 from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from agentwell import config
@@ -16,9 +18,40 @@ from agentwell.monitor.drift import DriftState, analyze as drift_analyze
 from agentwell.monitor.quality import QualityState, analyze as quality_analyze
 from agentwell.monitor.coordination import analyze as coord_analyze
 from agentwell.storage.db import init_db, create_session, record_health_event
+from agentwell.guard import (
+    sanitize_messages, validate_output, safe_parse_json,
+    InputViolation, OutputViolation, install_redactor,
+)
+
+# Install log redactor before any logging occurs (OWASP LLM02 / A09)
+install_redactor()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("agentwell")
+
+# Warn on startup if no API key set (OWASP A05 — security misconfiguration)
+if not config.API_KEY:
+    log.warning("AGENTWELL_API_KEY not set — proxy is open to anyone on this network. Set it for production use.")
+
+# ---------------------------------------------------------------------------
+# Rate limiting (OWASP LLM10 — unbounded consumption)
+# Simple in-memory sliding window: max 60 req/min per IP
+# ---------------------------------------------------------------------------
+_RATE_WINDOW = 60       # seconds
+_RATE_MAX = 60          # requests per window
+_rate_store: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(ip: str) -> bool:
+    now = time.monotonic()
+    window = _rate_store[ip]
+    # Drop entries older than window
+    _rate_store[ip] = [t for t in window if now - t < _RATE_WINDOW]
+    if len(_rate_store[ip]) >= _RATE_MAX:
+        return False
+    _rate_store[ip].append(now)
+    return True
+
 
 # Global session state (in-memory, per process)
 _drift_state = DriftState()
@@ -39,6 +72,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="agentwell", lifespan=lifespan)
 
+# CORS — locked to localhost only unless explicitly configured (OWASP A05)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost", "http://127.0.0.1"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
 
 def _auth_ok(request: Request) -> bool:
     if not config.API_KEY:
@@ -50,6 +91,11 @@ def _auth_ok(request: Request) -> bool:
     if not provided:
         return False
     return secrets.compare_digest(provided.encode(), config.API_KEY.encode())
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
 
 
 def _compute_health(drift_score: int, quality_score: int, coordination_detected: bool) -> int:
@@ -89,29 +135,43 @@ async def metrics():
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
+    # Auth check
     if not _auth_ok(request):
         raise HTTPException(status_code=401, detail="Unauthorized.")
 
+    # Rate limit (OWASP LLM10)
+    ip = _client_ip(request)
+    if not _check_rate_limit(ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 60 requests/minute.")
+
     body_bytes = await request.body()
-    try:
-        body = json.loads(body_bytes)
-    except json.JSONDecodeError:
+
+    # Safe JSON parse — never crash on malformed input (OWASP LLM05)
+    body = safe_parse_json(body_bytes.decode("utf-8", errors="replace"), context="request_body")
+    if not body:
         raise HTTPException(status_code=400, detail="Invalid JSON.")
 
     messages: list[dict] = body.get("messages", [])
     model: str = body.get("model", "unknown")
     stream: bool = body.get("stream", False)
 
-    # Coordination check — scans message structure only, no content stored
+    # Sanitize inbound messages — block injection attempts (OWASP LLM01)
+    try:
+        messages = sanitize_messages(messages)
+    except InputViolation as e:
+        log.warning(f"guard: injection blocked from {ip}: {e}")
+        raise HTTPException(status_code=400, detail="Input validation failed.")
+
+    # Coordination check on sanitized messages
     coord_result = coord_analyze(messages)
 
-    # Build prompt text for drift analysis (content used in-memory only, never persisted)
+    # Build prompt text for drift analysis — content in-memory only, never persisted
     prompt_text = " ".join(
         m.get("content", "") if isinstance(m.get("content"), str) else ""
         for m in messages
     )
 
-    # Forward request to upstream
+    # Forward to upstream
     upstream_headers = {
         k: v for k, v in request.headers.items()
         if k.lower() not in ("host", "content-length")
@@ -124,10 +184,10 @@ async def chat_completions(request: Request):
     if stream:
         return await _handle_streaming(
             body_bytes, upstream_headers, model, prompt_text,
-            coord_result, start_ms, messages,
+            coord_result, start_ms,
         )
 
-    async with httpx.AsyncClient(timeout=config._get_int("REQUEST_TIMEOUT_MS", 120000) / 1000) as client:
+    async with httpx.AsyncClient(timeout=120) as client:
         try:
             upstream_resp = await client.post(
                 _adapter.chat_url(),
@@ -140,10 +200,8 @@ async def chat_completions(request: Request):
     response_ms = int((time.monotonic() - start_ms) * 1000)
     had_error = upstream_resp.status_code >= 400
 
-    try:
-        resp_body = upstream_resp.json()
-    except Exception:
-        resp_body = {}
+    # Safe parse response (OWASP LLM05)
+    resp_body = safe_parse_json(upstream_resp.text, context="upstream_response")
 
     token_in = resp_body.get("usage", {}).get("prompt_tokens", 0)
     token_out = resp_body.get("usage", {}).get("completion_tokens", 0)
@@ -152,6 +210,13 @@ async def chat_completions(request: Request):
     if resp_body.get("choices"):
         finish_reason = resp_body["choices"][0].get("finish_reason", "")
         response_text = resp_body["choices"][0].get("message", {}).get("content", "") or ""
+
+    # Scan response for secrets before any logging (OWASP LLM02)
+    try:
+        validate_output(response_text, context="upstream_response")
+    except OutputViolation:
+        log.error("guard: secret pattern in upstream response — health event still recorded, content not logged")
+        response_text = "[REDACTED — secret pattern detected]"
 
     drift_result = drift_analyze(prompt_text, response_text, _drift_state)
     quality_result = quality_analyze(token_out, response_ms, finish_reason, had_error, _quality_state)
@@ -198,10 +263,7 @@ async def _handle_streaming(
     prompt_text: str,
     coord_result,
     start_ms: float,
-    messages: list[dict],
 ):
-    """Pass streaming responses through transparently. Monitor metadata only."""
-
     async def stream_generator():
         token_out = 0
         response_text_parts: list[str] = []
@@ -217,7 +279,7 @@ async def _handle_streaming(
                 async for line in upstream.aiter_lines():
                     if line.startswith("data: ") and line != "data: [DONE]":
                         try:
-                            chunk = json.loads(line[6:])
+                            chunk = safe_parse_json(line[6:], context="stream_chunk")
                             delta = chunk.get("choices", [{}])[0].get("delta", {})
                             content_piece = delta.get("content", "")
                             if content_piece:
@@ -232,6 +294,12 @@ async def _handle_streaming(
 
         response_ms = int((time.monotonic() - start_ms) * 1000)
         response_text = "".join(response_text_parts)
+
+        # Scan stream response for secrets (OWASP LLM02)
+        try:
+            validate_output(response_text, context="stream_response")
+        except OutputViolation:
+            response_text = "[REDACTED]"
 
         drift_result = drift_analyze(prompt_text, response_text, _drift_state)
         quality_result = quality_analyze(token_out, response_ms, finish_reason, False, _quality_state)
