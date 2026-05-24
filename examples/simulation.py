@@ -138,13 +138,17 @@ async def run_agent(agent: dict, day: int, client: httpx.AsyncClient) -> dict:
             {"role": "user", "content": task["content"]},
         ]
 
+        # Only sanitize user message — system prompt is ours, not untrusted input
+        user_messages = [m for m in messages if m.get("role") == "user"]
+        system_messages = [m for m in messages if m.get("role") != "user"]
         try:
-            messages = sanitize_messages(messages)
+            user_messages = sanitize_messages(user_messages)
         except InputViolation as e:
             print(f"  [task {global_task_num}] {task['id']} — BLOCKED by guard: {e}")
             results.append({"task_id": task["id"], "global_task_num": global_task_num, "blocked": True, "reason": str(e)})
             await asyncio.sleep(SLEEP_BETWEEN_CALLS)
             continue
+        messages = system_messages + user_messages
 
         # Compress prompts before sending — strips filler/articles (caveman technique)
         messages = compress_messages(messages, level="ultra")
