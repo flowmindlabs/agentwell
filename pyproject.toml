@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "agentwell"
+version = "0.1.0"
+description = "Behavioral health layer for AI agents. Agents that work with humans, not around them."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.115.12",
+    "uvicorn[standard]==0.34.2",
+    "httpx==0.28.1",
+    "sentence-transformers==3.4.1",
+    "vaderSentiment==3.3.2",
+    "aiosqlite==0.21.0",
+    "python-dotenv==1.1.0",
+    "streamlit==1.45.1",
+    "numpy>=1.24,<3.0",
+    "pandas>=2.0,<3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.5", "pytest-asyncio==0.25.3"]
+
+[project.scripts]
+agentwell = "agentwell.proxy.server:app"
+
+[project.urls]
+Homepage = "https://github.com/flowmindlabs/agentwell"
+Repository = "https://github.com/flowmindlabs/agentwell"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
