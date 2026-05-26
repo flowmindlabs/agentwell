@@ -80,6 +80,49 @@ nano .env                  # set GROQ_API_KEY and AGENTWELL_UPSTREAM
 agentwell start            # proxy on 0.0.0.0:3001
 ```
 
+### Enterprise (internal LLM proxy)
+
+Enterprises run one shared LLM proxy (ai-proxy, LiteLLM, Azure OpenAI gateway, etc.).
+Each team installs agentwell and points it at that proxy — no personal API keys needed.
+
+**Step 1 — Install on your server or in your agent project:**
+```bash
+git clone https://github.com/flowmindlabs/agentwell
+cd agentwell
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
+```
+
+**Step 2 — Configure to point at your internal proxy:**
+```bash
+agentwell init
+```
+Then edit `.env` — set these two values (ask your platform/infra team):
+```env
+AGENTWELL_UPSTREAM=http://your-internal-llm-proxy/v1
+AGENTWELL_API_KEY=your-internal-api-key
+```
+
+**Step 3 — Start:**
+```bash
+agentwell start
+```
+
+**Step 4 — Point your agent code at agentwell:**
+```python
+base_url = "http://localhost:3001/v1"   # agentwell sits in front of your proxy
+# auth to your internal proxy is handled via AGENTWELL_API_KEY in .env
+# your agent code needs no keys — agentwell forwards them
+```
+
+**Step 5 — Monitor:**
+```bash
+agentwell status   # live health score
+agentwell report   # daily health report from DB
+```
+
+agentwell works with any OpenAI-compatible internal proxy — no changes to your existing LLM infrastructure.
+
 > **Supply chain note:** All versions are pinned in `requirements.txt`. Verified clean at release. Never run `pip install --upgrade` blindly — check [socket.dev](https://socket.dev) before upgrading any package.
 
 **Production:** Set environment variables directly in your system or infra. Never commit `.env`. System env vars always take priority over `.env`.
