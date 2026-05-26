@@ -6,6 +6,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from collections import defaultdict
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, Request, Response, HTTPException
@@ -79,7 +80,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost", "http://127.0.0.1"],
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["content-type", "authorization", "x-api-key"],
 )
 
 
@@ -96,8 +97,13 @@ def _auth_ok(request: Request) -> bool:
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    client_host = request.client.host if request.client else "unknown"
+    # Only trust X-Forwarded-For from loopback/private proxy — never from external clients
+    if client_host in ("127.0.0.1", "::1", "localhost"):
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return client_host
 
 
 def _compute_health(drift_score: int, quality_score: int, coordination_detected: bool) -> int:
@@ -149,7 +155,11 @@ async def chat_completions(request: Request):
     body_bytes = await request.body()
 
     # Safe JSON parse — never crash on malformed input (OWASP LLM05)
-    body = safe_parse_json(body_bytes.decode("utf-8", errors="replace"), context="request_body")
+    try:
+        body_decoded = body_bytes.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid encoding — UTF-8 required.")
+    body = safe_parse_json(body_decoded, context="request_body")
     if not body:
         raise HTTPException(status_code=400, detail="Invalid JSON.")
 
@@ -173,12 +183,14 @@ async def chat_completions(request: Request):
         for m in messages
     )
 
-    # Forward to upstream — inject Groq key from config if present
+    # Forward to upstream — only inject Groq key if upstream is actually Groq
     upstream_headers = {
         k: v for k, v in request.headers.items()
         if k.lower() not in ("host", "content-length")
     }
-    if config.GROQ_API_KEY:
+    upstream_host = (urlparse(config.UPSTREAM_URL).hostname or "").lower()
+    is_groq_upstream = upstream_host == "groq.com" or upstream_host.endswith(".groq.com")
+    if config.GROQ_API_KEY and is_groq_upstream:
         upstream_headers["authorization"] = f"Bearer {config.GROQ_API_KEY}"
     if _adapter:
         upstream_headers.update(_adapter.extra_request_headers())
@@ -198,8 +210,8 @@ async def chat_completions(request: Request):
                 content=body_bytes,
                 headers=upstream_headers,
             )
-        except httpx.RequestError as e:
-            raise HTTPException(status_code=502, detail=f"Upstream unreachable: {e}")
+        except httpx.RequestError:
+            raise HTTPException(status_code=502, detail="Upstream unavailable.")
 
     response_ms = int((time.monotonic() - start_ms) * 1000)
     had_error = upstream_resp.status_code >= 400
@@ -245,12 +257,16 @@ async def chat_completions(request: Request):
     if health_score < config.HEALTH_THRESHOLD:
         log.warning(f"Health alert | score={health_score} drift={drift_result.drift_score} quality={quality_result.quality_score} flags={all_flags}")
 
-    response_headers = dict(upstream_resp.headers)
+    # Whitelist safe upstream headers — never forward auth/secret headers to client
+    _SAFE_RESPONSE_HEADERS = {"content-type", "x-request-id", "x-ratelimit-limit-requests",
+                               "x-ratelimit-limit-tokens", "x-ratelimit-remaining-requests",
+                               "x-ratelimit-remaining-tokens", "x-ratelimit-reset-requests",
+                               "x-ratelimit-reset-tokens"}
+    response_headers = {k: v for k, v in upstream_resp.headers.items()
+                        if k.lower() in _SAFE_RESPONSE_HEADERS}
     response_headers["X-Agentwell-Health"] = str(health_score)
-    response_headers["X-Agentwell-Flags"] = ",".join(all_flags) if all_flags else "none"
+    response_headers["X-Agentwell-Flags"] = ",".join(all_flags[:10]) if all_flags else "none"
     response_headers["X-Agentwell-Privacy"] = "metadata-only"
-    response_headers.pop("content-encoding", None)
-    response_headers.pop("transfer-encoding", None)
 
     return Response(
         content=upstream_resp.content,
