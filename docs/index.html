@@ -426,6 +426,7 @@
     <li><a href="#signals">Signals</a></li>
     <li><a href="#how">How it works</a></li>
     <li><a href="#start">Quick start</a></li>
+    <li><a href="#cli">CLI</a></li>
     <li><a href="https://github.com/flowmindlabs/agentwell" target="_blank">GitHub</a></li>
   </ul>
 </nav>
@@ -647,6 +648,92 @@
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- CLI -->
+<section id="cli">
+  <div class="section-label">CLI</div>
+  <h2>Four commands. Full control.</h2>
+  <p class="lead">agentwell ships a CLI for every operational state — setup, run, inspect, report.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;">
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">agentwell init</span>
+      </div>
+      <div class="terminal-body">
+        <code><span class="prompt">$</span> <span class="cmd">agentwell init</span></code>
+        <code><span class="health-ok">created</span>  <span class="out">.env</span></code>
+        <code><span class="out">  edit GROQ_API_KEY before starting</span></code>
+        <code><span class="out">  never commit .env — already in .gitignore</span></code>
+        <code>&nbsp;</code>
+        <code><span class="out">  # overwrite existing .env</span></code>
+        <code><span class="prompt">$</span> <span class="cmd">agentwell init --force</span></code>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">agentwell start</span>
+      </div>
+      <div class="terminal-body">
+        <code><span class="prompt">$</span> <span class="cmd">agentwell start</span></code>
+        <code><span class="out">agentwell  proxy starting on 0.0.0.0:3001</span></code>
+        <code><span class="out">  upstream : https://api.groq.com/openai</span></code>
+        <code><span class="out">  db       : ./agentwell.db</span></code>
+        <code><span class="out">  threshold: 70</span></code>
+        <code>&nbsp;</code>
+        <code><span class="prompt">$</span> <span class="cmd">agentwell start --port 8080 --host 127.0.0.1</span></code>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">agentwell status</span>
+      </div>
+      <div class="terminal-body">
+        <code><span class="prompt">$</span> <span class="cmd">agentwell status</span></code>
+        <code><span class="out">agentwell  proxy status</span></code>
+        <code>&nbsp;</code>
+        <code><span class="out">  status    : </span><span class="health-ok">ok</span></code>
+        <code><span class="out">  upstream  : https://api.groq.com/openai</span></code>
+        <code><span class="out">  adapter   : groq</span></code>
+        <code><span class="out">  session   : a3f9c2d1…</span></code>
+        <code>&nbsp;</code>
+        <code><span class="out">  session metrics</span></code>
+        <code><span class="out">  health    : </span><span class="health-warn">61</span><span class="out">  </span><span class="flag">watch</span></code>
+        <code><span class="out">  calls     : 24</span></code>
+        <code><span class="out">  flags     : </span><span class="flag">repetition_high</span></code>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="terminal-title">agentwell report</span>
+      </div>
+      <div class="terminal-body">
+        <code><span class="prompt">$</span> <span class="cmd">agentwell report</span></code>
+        <code><span class="out">agentwell  daily report  2026-05-26</span></code>
+        <code>&nbsp;</code>
+        <code><span class="out">  events    : 142  sessions: 3</span></code>
+        <code><span class="out">  health    : </span><span class="health-ok">95</span><span class="out"> → </span><span class="health-crit">38</span><span class="out">  min=38 avg=71.4</span></code>
+        <code><span class="out">  drift     : 0 → 44  max=44</span></code>
+        <code><span class="out">  quality   : 91 → 62  min=55</span></code>
+        <code><span class="out">  coord     : </span><span class="flag">3 coordination events detected</span></code>
+        <code>&nbsp;</code>
+        <code><span class="out">  thresholds crossed:</span></code>
+        <code><span class="out">    &lt; 80 at event 18</span></code>
+        <code><span class="out">    &lt; 60 at event 31</span></code>
+        <code><span class="out">    </span><span class="health-crit">&lt; 40 at event 35  ← critical</span></code>
+      </div>
+    </div>
+
   </div>
 </section>
 
