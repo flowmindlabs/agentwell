@@ -4,7 +4,7 @@
 **Dates:** 2026-05-24 → 2026-05-26  
 **Environment:** EC2 t3.large, Ubuntu 26.04, Python 3.12.3, Groq free tier  
 **Upstream:** `https://api.groq.com/openai`  
-**Cost:** ~$0.02 total (Groq free tier)
+**Cost:** $0.07 total (Groq free tier)
 
 ---
 
