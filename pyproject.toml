@@ -1,10 +1,10 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentwell"
-version = "0.1.4"
+version = "0.1.5"
 description = "Behavioral health layer for AI agents. Agents that work with humans, not around them."
 readme = "README.md"
 license = { file = "LICENSE" }
