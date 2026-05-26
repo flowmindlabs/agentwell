@@ -6,6 +6,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from collections import defaultdict
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, Request, Response, HTTPException
@@ -187,7 +188,9 @@ async def chat_completions(request: Request):
         k: v for k, v in request.headers.items()
         if k.lower() not in ("host", "content-length")
     }
-    if config.GROQ_API_KEY and "groq.com" in config.UPSTREAM_URL.lower():
+    upstream_host = (urlparse(config.UPSTREAM_URL).hostname or "").lower()
+    is_groq_upstream = upstream_host == "groq.com" or upstream_host.endswith(".groq.com")
+    if config.GROQ_API_KEY and is_groq_upstream:
         upstream_headers["authorization"] = f"Bearer {config.GROQ_API_KEY}"
     if _adapter:
         upstream_headers.update(_adapter.extra_request_headers())
