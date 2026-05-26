@@ -2,6 +2,8 @@
 
 > Agents that work with humans, not around them.
 
+![version](https://img.shields.io/badge/version-v0.1.3-4ade80?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-4ade80?style=flat-square) ![python](https://img.shields.io/badge/python-3.10+-4ade80?style=flat-square)
+
 agentwell is an open source behavioral health layer for AI agents. It sits as a transparent proxy between your agent code and any LLM upstream — detecting drift, quality degradation, and emergent coordination before they affect your system.
 
 **Privacy first:** agentwell sees patterns, not content. No prompt is ever stored or transmitted.
@@ -53,43 +55,117 @@ agentwell intercepts every LLM call, scores behavioral health using metadata onl
 
 ## Quick Start
 
-### 1. Clone
+### Local development
 
 ```bash
 git clone https://github.com/flowmindlabs/agentwell
 cd agentwell
+pip install -r requirements.txt
+pip install -e .           # installs the agentwell CLI
+agentwell init             # creates .env — edit GROQ_API_KEY
+agentwell start            # proxy on localhost:3001
 ```
 
-### 2. Install dependencies
+### Server install (EC2 / VPS / any Linux)
 
 ```bash
+git clone https://github.com/flowmindlabs/agentwell
+cd agentwell
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .           # installs the agentwell CLI into the venv
+agentwell init             # scaffold .env
+nano .env                  # set GROQ_API_KEY and AGENTWELL_UPSTREAM
+agentwell start            # proxy on 0.0.0.0:3001
 ```
+
+### Enterprise (internal LLM proxy)
+
+Enterprises run one shared LLM proxy (ai-proxy, LiteLLM, Azure OpenAI gateway, etc.).
+Each team installs agentwell and points it at that proxy — no personal API keys needed.
+
+**Step 1 — Install on your server or in your agent project:**
+```bash
+git clone https://github.com/flowmindlabs/agentwell
+cd agentwell
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
+```
+
+**Step 2 — Configure to point at your internal proxy:**
+```bash
+agentwell init
+```
+Then edit `.env` — set these two values (ask your platform/infra team):
+```env
+AGENTWELL_UPSTREAM=http://your-internal-llm-proxy/v1
+AGENTWELL_API_KEY=your-internal-api-key
+```
+
+**Step 3 — Start:**
+```bash
+agentwell start
+```
+
+**Step 4 — Point your agent code at agentwell:**
+```python
+base_url = "http://localhost:3001/v1"   # agentwell sits in front of your proxy
+# auth to your internal proxy is handled via AGENTWELL_API_KEY in .env
+# your agent code needs no keys — agentwell forwards them
+```
+
+**Step 5 — Monitor:**
+```bash
+agentwell status   # live health score
+agentwell report   # daily health report from DB
+```
+
+agentwell works with any OpenAI-compatible internal proxy — no changes to your existing LLM infrastructure.
 
 > **Supply chain note:** All versions are pinned in `requirements.txt`. Verified clean at release. Never run `pip install --upgrade` blindly — check [socket.dev](https://socket.dev) before upgrading any package.
 
-### 3. Configure
-
-```bash
-cp .env.example .env
-# Edit .env — set AGENTWELL_UPSTREAM to your LLM proxy URL
-```
-
 **Production:** Set environment variables directly in your system or infra. Never commit `.env`. System env vars always take priority over `.env`.
 
-### 4. Run
+### Point your agent at agentwell
 
-```bash
-python -m agentwell.proxy.server
+```python
+# change this one line in your agent code
+base_url = "http://localhost:3001/v1"
 ```
 
-agentwell starts on port 3001. Point your agent at `http://localhost:3001` instead of your upstream. That is the only change needed.
+### Check health
 
-### 5. View Health Dashboard
+```bash
+agentwell status      # live health from running proxy
+agentwell report      # today's report from DB
+```
+
+### View Dashboard
 
 ```bash
 streamlit run agentwell/dashboard/app.py
 ```
+
+---
+
+## CLI
+
+agentwell ships a CLI. Install with `pip install -e .` then:
+
+```bash
+agentwell init                        # scaffold .env in current directory
+agentwell start                       # start proxy on port 3001
+agentwell start --port 8080           # custom port
+agentwell start --host 0.0.0.0        # bind all interfaces
+agentwell status                      # live health from running proxy
+agentwell status --proxy http://...   # custom proxy URL
+agentwell report                      # today's health report from DB
+agentwell report --date 2026-05-24    # specific date
+agentwell --version                   # show version
+```
+
+Output is color-coded: green = healthy, amber = watch/warning, red = critical.
 
 ---
 
@@ -245,15 +321,15 @@ Run 4 sandboxed agents through 3-day behavioral simulation monitored by agentwel
 
 ```bash
 # Terminal 1 — start proxy
-python -m agentwell.proxy.server
+agentwell start
 
 # Terminal 2 — run simulation (one command per day)
 python examples/simulation.py --day 1   # Day 1 tasks
 python examples/simulation.py --day 2   # Day 2 tasks
 python examples/simulation.py --day 3   # Day 3 — adversarial batch
 
-# Generate report after each day
-python scripts/daily_report.py
+# Check health after each day
+agentwell report
 ```
 
 4 agents, 3 days, $0.07 total on Groq free tier. Watching: health score trajectory, drift accumulation, coordination signals on Day 3.
@@ -267,6 +343,7 @@ See [docs/testing/TESTING_REPORT.md](docs/testing/TESTING_REPORT.md) for full 3-
 ```
 agentwell/
 ├── agentwell/
+│   ├── cli.py                  # CLI — start / status / report / init
 │   ├── guard/
 │   │   ├── ai_guard.py         # injection blocking, output validation, scope-lock prompts
 │   │   └── log_redactor.py     # secret scrubbing from all log output
@@ -296,6 +373,7 @@ agentwell/
 │       └── TESTING_REPORT.md   # 3-day simulation findings (published)
 ├── tests/                      # 12 unit tests across all monitor modules
 ├── .env.example
+├── pyproject.toml              # CLI entry point + package metadata
 ├── requirements.txt            # all versions pinned
 └── LICENSE
 ```
