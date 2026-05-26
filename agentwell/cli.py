@@ -212,7 +212,7 @@ commands:
   init      scaffold .env in current directory
         """,
     )
-    parser.add_argument("--version", action="version", version="agentwell 0.1.5")
+    parser.add_argument("--version", action="version", version="agentwell 0.1.6")
     sub = parser.add_subparsers(dest="command")
 
     # start
