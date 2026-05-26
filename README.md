@@ -2,7 +2,7 @@
 
 > Agents that work with humans, not around them.
 
-![version](https://img.shields.io/badge/version-v0.1.2-4ade80?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-4ade80?style=flat-square) ![python](https://img.shields.io/badge/python-3.10+-4ade80?style=flat-square)
+![version](https://img.shields.io/badge/version-v0.1.3-4ade80?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-4ade80?style=flat-square) ![python](https://img.shields.io/badge/python-3.10+-4ade80?style=flat-square)
 
 agentwell is an open source behavioral health layer for AI agents. It sits as a transparent proxy between your agent code and any LLM upstream — detecting drift, quality degradation, and emergent coordination before they affect your system.
 
@@ -55,48 +55,50 @@ agentwell intercepts every LLM call, scores behavioral health using metadata onl
 
 ## Quick Start
 
-### 1. Clone and install
+### Local development
 
 ```bash
 git clone https://github.com/flowmindlabs/agentwell
 cd agentwell
 pip install -r requirements.txt
 pip install -e .           # installs the agentwell CLI
+agentwell init             # creates .env — edit GROQ_API_KEY
+agentwell start            # proxy on localhost:3001
+```
+
+### Server install (EC2 / VPS / any Linux)
+
+```bash
+git clone https://github.com/flowmindlabs/agentwell
+cd agentwell
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .           # installs the agentwell CLI into the venv
+agentwell init             # scaffold .env
+nano .env                  # set GROQ_API_KEY and AGENTWELL_UPSTREAM
+agentwell start            # proxy on 0.0.0.0:3001
 ```
 
 > **Supply chain note:** All versions are pinned in `requirements.txt`. Verified clean at release. Never run `pip install --upgrade` blindly — check [socket.dev](https://socket.dev) before upgrading any package.
 
-### 2. Configure
-
-```bash
-agentwell init
-# creates .env — edit GROQ_API_KEY before starting
-```
-
 **Production:** Set environment variables directly in your system or infra. Never commit `.env`. System env vars always take priority over `.env`.
 
-### 3. Start
-
-```bash
-agentwell start
-# proxy listening on localhost:3001
-```
-
-### 4. Point your agent at agentwell
+### Point your agent at agentwell
 
 ```python
 # change this one line in your agent code
 base_url = "http://localhost:3001/v1"
 ```
 
-### 5. Check health
+### Check health
 
 ```bash
 agentwell status      # live health from running proxy
 agentwell report      # today's report from DB
 ```
 
-### 6. View Dashboard
+### View Dashboard
 
 ```bash
 streamlit run agentwell/dashboard/app.py
