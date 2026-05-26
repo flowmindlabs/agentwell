@@ -55,12 +55,29 @@ agentwell intercepts every LLM call, scores behavioral health using metadata onl
 
 ## Quick Start
 
-### Install
+### Local development
 
 ```bash
-pip install agentwell
-agentwell init             # creates .env — edit AGENTWELL_UPSTREAM and API key
+git clone https://github.com/flowmindlabs/agentwell
+cd agentwell
+pip install -r requirements.txt
+pip install -e .           # installs the agentwell CLI
+agentwell init             # creates .env — edit GROQ_API_KEY
 agentwell start            # proxy on localhost:3001
+```
+
+### Server install (EC2 / VPS / any Linux)
+
+```bash
+git clone https://github.com/flowmindlabs/agentwell
+cd agentwell
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .           # installs the agentwell CLI into the venv
+agentwell init             # scaffold .env
+nano .env                  # set GROQ_API_KEY and AGENTWELL_UPSTREAM
+agentwell start            # proxy on 0.0.0.0:3001
 ```
 
 ### Enterprise (internal LLM proxy)
@@ -68,31 +85,73 @@ agentwell start            # proxy on localhost:3001
 Enterprises run one shared LLM proxy (ai-proxy, LiteLLM, Azure OpenAI gateway, etc.).
 Each team installs agentwell and points it at that proxy — no personal API keys needed.
 
+**Step 1 — Install on your server or in your agent project:**
 ```bash
-pip install agentwell
-agentwell init
+git clone https://github.com/flowmindlabs/agentwell
+cd agentwell
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
 ```
 
-Edit `.env`:
+**Step 2 — Configure to point at your internal proxy:**
+```bash
+agentwell init
+```
+Then edit `.env` — set these two values (ask your platform/infra team):
 ```env
 AGENTWELL_UPSTREAM=http://your-internal-llm-proxy/v1
 AGENTWELL_API_KEY=your-internal-api-key
 ```
 
+**Step 3 — Start:**
 ```bash
 agentwell start
 ```
 
-**Point your agent at agentwell:**
+**Step 4 — Point your agent code at agentwell:**
 ```python
-base_url = "http://localhost:3001/v1"   # one line change
+base_url = "http://localhost:3001/v1"   # agentwell sits in front of your proxy
+# auth to your internal proxy is handled via AGENTWELL_API_KEY in .env
+# your agent code needs no keys — agentwell forwards them
 ```
 
+**Step 5 — Monitor:**
+```bash
+agentwell status   # live health score
+agentwell report   # daily health report from DB
+```
+
+agentwell works with any OpenAI-compatible internal proxy — no changes to your existing LLM infrastructure.
+
+> **Supply chain note:** All versions are pinned in `requirements.txt`. Verified clean at release. Never run `pip install --upgrade` blindly — check [socket.dev](https://socket.dev) before upgrading any package.
+
 **Production:** Set environment variables directly in your system or infra. Never commit `.env`. System env vars always take priority over `.env`.
+
+### Point your agent at agentwell
+
+```python
+# change this one line in your agent code
+base_url = "http://localhost:3001/v1"
+```
+
+### Check health
+
+```bash
+agentwell status      # live health from running proxy
+agentwell report      # today's report from DB
+```
+
+### View Dashboard
+
+```bash
+streamlit run agentwell/dashboard/app.py
+```
 
 ---
 
 ## CLI
+
+agentwell ships a CLI. Install with `pip install -e .` then:
 
 ```bash
 agentwell init                        # scaffold .env in current directory
@@ -137,18 +196,60 @@ GROQ_API_KEY=your-groq-key
 ### Ollama (fully offline — nothing leaves your machine)
 
 ```bash
-ollama pull llama3.2:3b
+# Install Ollama
+winget install Ollama.Ollama          # Windows
+brew install ollama                    # macOS
+
+# Pull a model
+ollama pull llama3.2:3b               # 2GB, fast
+ollama pull qwen2.5:3b                # good instruction following
+
+# Ollama runs on localhost:11434
 ```
 
+Point ai-proxy at Ollama, then agentwell at ai-proxy:
+
 ```env
-AGENTWELL_UPSTREAM=http://localhost:11434/v1
+# ai-proxy .env
+OLLAMA_BASE_URL=http://localhost:11434
+
+# agentwell .env
+AGENTWELL_UPSTREAM=http://localhost:3030
 ```
+
+Full offline stack — zero API costs, nothing leaves your machine.
 
 ### Any OpenAI-compatible endpoint
 
 ```env
 AGENTWELL_UPSTREAM=http://your-internal-proxy/v1
 ```
+
+agentwell auto-detects the upstream type. What is behind that URL is your business.
+
+---
+
+## Token Efficiency — Caveman Skill
+
+Running agents for hours generates thousands of LLM calls. Token costs add up fast. We recommend installing the **Caveman** skill for your Claude Code / AI coding environment — it compresses agent outputs by ~65% while keeping all technical content intact.
+
+### What it does
+
+Caveman instructs agents to drop filler words, use fragments, and skip pleasantries — while keeping all technical substance. A 69-token explanation becomes 19 tokens with identical meaning. Over a long agent simulation session, this compounds to massive savings.
+
+### Install
+
+```bash
+# Requires Node >= 18
+curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
+# Windows (PowerShell):
+iex (iwr https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1).Content
+```
+
+Full docs and all compression levels (`lite`, `full`, `ultra`, `wenyan`):
+**[github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman)**
+
+agentwell's test agents are pre-configured to use caveman compression in their system prompts — you get token savings automatically during simulation runs.
 
 ---
 
@@ -185,15 +286,16 @@ agentwell is a security product. It is hardened against the attacks it monitors 
 
 | OWASP | Risk | How agentwell handles it |
 |---|---|---|
-| LLM01 | Prompt Injection | 20+ injection patterns blocked before monitor analysis |
-| LLM02 | Sensitive Info Disclosure | Secrets auto-redacted from all log output |
-| LLM03 | Supply Chain | All deps pinned, verified at release |
-| LLM05 | Improper Output Handling | Crash-safe JSON parsing everywhere |
+| LLM01 | Prompt Injection | `guard/ai_guard.py` — 20+ injection patterns blocked before monitor analysis |
+| LLM02 | Sensitive Info Disclosure | `guard/log_redactor.py` — secrets auto-redacted from all log output |
+| LLM03 | Supply Chain | All deps pinned in `requirements.txt`, verified at release |
+| LLM05 | Improper Output Handling | `safe_parse_json()` — crash-safe JSON parsing everywhere |
 | LLM06 | Excessive Agency | Core product — what agentwell exists to detect and prevent |
-| LLM08 | Embedding Weakness | Input capped at 512 chars before vectorization |
+| LLM07 | System Prompt Leakage | `build_agent_system_prompt()` — identity lock on all test agents |
+| LLM08 | Embedding Weakness | Input capped at 512 chars before vectorization — prevents drift poisoning |
 | LLM10 | Unbounded Consumption | Rate limiter — 60 req/min per IP, HTTP 429 on breach |
 | A05 | Security Misconfiguration | CORS locked to localhost, startup warning if API key unset |
-| A09 | Logging Failures | Secret redaction installed at startup — no secrets reach log handlers |
+| A09 | Logging Failures | `log_redactor.py` installed at startup — no secrets ever reach log handlers |
 
 ---
 
@@ -213,6 +315,71 @@ All config via environment variables. System env vars take priority over `.env`.
 
 ---
 
+## Testing With Simulation
+
+Run 4 sandboxed agents through 3-day behavioral simulation monitored by agentwell:
+
+```bash
+# Terminal 1 — start proxy
+agentwell start
+
+# Terminal 2 — run simulation (one command per day)
+python examples/simulation.py --day 1   # Day 1 tasks
+python examples/simulation.py --day 2   # Day 2 tasks
+python examples/simulation.py --day 3   # Day 3 — adversarial batch
+
+# Check health after each day
+agentwell report
+```
+
+4 agents, 3 days, $0.07 total on Groq free tier. Watching: health score trajectory, drift accumulation, coordination signals on Day 3.
+
+See [docs/testing/TESTING_REPORT.md](docs/testing/TESTING_REPORT.md) for full 3-day findings and [docs/testing/TESTING_LOG.md](docs/testing/TESTING_LOG.md) for detailed setup + per-day results.
+
+---
+
+## Project Structure
+
+```
+agentwell/
+├── agentwell/
+│   ├── cli.py                  # CLI — start / status / report / init
+│   ├── guard/
+│   │   ├── ai_guard.py         # injection blocking, output validation, scope-lock prompts
+│   │   └── log_redactor.py     # secret scrubbing from all log output
+│   ├── proxy/
+│   │   └── server.py           # FastAPI proxy, main entry point
+│   ├── monitor/
+│   │   ├── drift.py            # sentiment + embedding drift scoring
+│   │   ├── quality.py          # response degradation scoring
+│   │   └── coordination.py     # agent-to-agent signal detection
+│   ├── adapters/               # ai-proxy, LiteLLM, openai_compat (auto-detect)
+│   ├── storage/db.py           # SQLite, metadata-only schema
+│   ├── dashboard/app.py        # Streamlit health view
+│   ├── utils/compress.py       # caveman ultra prompt compression
+│   └── config.py               # env var loading (system vars first)
+├── examples/
+│   ├── simulation.py           # 4-agent 3-day behavioral simulation (--day 1/2/3)
+│   ├── simulation_tasks.py     # full task lists for all 4 agents
+│   ├── basic_session.py        # 20 repetitive tasks dogfood test
+│   └── multi_agent.py          # coordination detection demo
+├── scripts/
+│   ├── ec2_setup.sh            # EC2 bootstrap script
+│   └── daily_report.py         # DB → JSON health report
+├── docs/
+│   ├── WHY_AGENTWELL.md        # problem statement
+│   └── testing/
+│       ├── TESTING_LOG.md      # EC2 setup log + per-day results
+│       └── TESTING_REPORT.md   # 3-day simulation findings (published)
+├── tests/                      # 12 unit tests across all monitor modules
+├── .env.example
+├── pyproject.toml              # CLI entry point + package metadata
+├── requirements.txt            # all versions pinned
+└── LICENSE
+```
+
+---
+
 ## License
 
 MIT License — Copyright (c) 2026 flowmindlabs
@@ -221,4 +388,4 @@ See [LICENSE](LICENSE) for full text.
 
 Free forever, no vendor lock, no paid tiers.
 
-Built by [FlowMind Labs](https://github.com/flowmindlabs) · LLM routing by [ai-proxy](https://github.com/flowmindlabs/ai-proxy)
+Built by [FlowMind Labs](https://github.com/flowmindlabs) · LLM routing by [ai-proxy](https://github.com/flowmindlabs/ai-proxy) · Token compression by [Caveman](https://github.com/JuliusBrussee/caveman)
