@@ -256,9 +256,9 @@ python examples/simulation.py --day 3   # Day 3 — adversarial batch
 python scripts/daily_report.py
 ```
 
-4 agents, 3 days, $0 cost on Groq free tier. Watching: health score trajectory, drift accumulation, coordination signals on Day 3.
+4 agents, 3 days, $0.07 total on Groq free tier. Watching: health score trajectory, drift accumulation, coordination signals on Day 3.
 
-See [docs/testing/TESTING_LOG.md](docs/testing/TESTING_LOG.md) for setup log and first test results.
+See [docs/testing/TESTING_REPORT.md](docs/testing/TESTING_REPORT.md) for full 3-day findings and [docs/testing/TESTING_LOG.md](docs/testing/TESTING_LOG.md) for detailed setup + per-day results.
 
 ---
 
@@ -292,7 +292,8 @@ agentwell/
 ├── docs/
 │   ├── WHY_AGENTWELL.md        # problem statement
 │   └── testing/
-│       └── TESTING_LOG.md      # EC2 setup log + test results
+│       ├── TESTING_LOG.md      # EC2 setup log + per-day results
+│       └── TESTING_REPORT.md   # 3-day simulation findings (published)
 ├── tests/                      # 12 unit tests across all monitor modules
 ├── .env.example
 ├── requirements.txt            # all versions pinned
