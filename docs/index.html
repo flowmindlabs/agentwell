@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>agentwell — behavioral health for AI agents</title>
+  <meta name="description" content="agentwell is an open source proxy that monitors AI agent behavioral health in real time. Detects drift, quality degradation, and emergent coordination — before they affect your system." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0f0e;
+      --bg2:      #131614;
+      --bg3:      #1a1d1b;
+      --border:   #252926;
+      --text:     #c8cfc9;
+      --muted:    #5a6360;
+      --green:    #4ade80;
+      --green2:   #22c55e;
+      --amber:    #fbbf24;
+      --red:      #f87171;
+      --font:     'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    a { color: var(--green); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── NAV ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 48px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--green);
+      letter-spacing: -0.5px;
+    }
+
+    .nav-logo span { color: var(--muted); font-weight: 400; }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ── HERO ── */
+    .hero {
+      max-width: 860px;
+      margin: 100px auto 80px;
+      padding: 0 32px;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 2px;
+      margin-bottom: 32px;
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -1px;
+      margin-bottom: 20px;
+      color: #e8ede9;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--green);
+    }
+
+    .hero p {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 40px;
+      line-height: 1.8;
+    }
+
+    /* ── TERMINAL BLOCK ── */
+    .terminal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      max-width: 620px;
+      margin: 0 auto;
+      text-align: left;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg3);
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+
+    .terminal-title {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: 8px;
+    }
+
+    .terminal-body { padding: 20px 24px; }
+
+    .terminal-body code {
+      display: block;
+      font-size: 13px;
+      line-height: 2;
+    }
+
+    .prompt { color: var(--green); }
+    .cmd    { color: var(--text); }
+    .out    { color: var(--muted); }
+    .health-ok   { color: var(--green); }
+    .health-warn { color: var(--amber); }
+    .health-crit { color: var(--red); }
+    .flag   { color: var(--amber); }
+
+    /* ── SECTION ── */
+    section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 80px 32px;
+      border-top: 1px solid var(--border);
+    }
+
+    .section-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: clamp(20px, 3vw, 28px);
+      font-weight: 700;
+      color: #e8ede9;
+      letter-spacing: -0.5px;
+      margin-bottom: 16px;
+    }
+
+    .lead {
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 560px;
+      margin-bottom: 48px;
+      line-height: 1.8;
+    }
+
+    /* ── SIGNAL GRID ── */
+    .signal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .signal-card {
+      background: var(--bg2);
+      padding: 24px;
+    }
+
+    .signal-icon {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .signal-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e8ede9;
+      margin-bottom: 6px;
+    }
+
+    .signal-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── HEALTH TABLE ── */
+    .health-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .health-table th, .health-table td {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .health-table th {
+      background: var(--bg3);
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .health-table tr:last-child td { border-bottom: none; }
+    .health-table td:first-child { font-weight: 700; }
+
+    /* ── ARCH ── */
+    .arch {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 32px;
+      font-size: 13px;
+      line-height: 2.2;
+    }
+
+    .arch-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .arch-box {
+      border: 1px solid var(--border);
+      padding: 6px 16px;
+      border-radius: 3px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .arch-box.hl {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .arch-arrow {
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .arch-note {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: 8px;
+    }
+
+    /* ── QUICKSTART ── */
+    .steps { display: flex; flex-direction: column; gap: 24px; }
+
+    .step {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--muted);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-body { flex: 1; }
+
+    .step-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e8ede9;
+      margin-bottom: 8px;
+    }
+
+    .code-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 14px 18px;
+      font-size: 12px;
+      line-height: 1.9;
+      overflow-x: auto;
+    }
+
+    .code-block .prompt { color: var(--green); user-select: none; }
+    .code-block .comment { color: var(--muted); }
+
+    /* ── PRIVACY BANNER ── */
+    .privacy-banner {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--green);
+      border-radius: 4px;
+      padding: 16px 20px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 48px;
+    }
+
+    .privacy-banner strong { color: var(--green); }
+
+    /* ── CTA ── */
+    .cta-section {
+      text-align: center;
+      padding: 80px 32px;
+      border-top: 1px solid var(--border);
+    }
+
+    .cta-section h2 { margin-bottom: 12px; }
+    .cta-section p  { color: var(--muted); margin-bottom: 32px; font-size: 13px; }
+
+    .btn-group { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      border-radius: 4px;
+      font-family: var(--font);
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; text-decoration: none; }
+
+    .btn-primary {
+      background: var(--green);
+      color: #0d0f0e;
+      font-weight: 700;
+      border: none;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      nav { padding: 14px 20px; }
+      .nav-links { gap: 16px; }
+      section { padding: 48px 20px; }
+      .arch-row { flex-wrap: wrap; }
+      footer { flex-direction: column; gap: 8px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">agentwell<span>.health</span></div>
+  <ul class="nav-links">
+    <li><a href="#signals">Signals</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#start">Quick start</a></li>
+    <li><a href="https://github.com/flowmindlabs/agentwell" target="_blank">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">open source · MIT · v0.1.2</div>
+  <h1>Your agents run.<br><em>agentwell watches.</em></h1>
+  <p>
+    A transparent proxy that monitors AI agent behavioral health in real time —
+    detecting drift, quality degradation, and emergent coordination
+    before they affect your system.
+  </p>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+      <span class="terminal-title">agentwell proxy — localhost:3001</span>
+    </div>
+    <div class="terminal-body">
+      <code><span class="prompt">$</span> <span class="cmd">python -m agentwell.proxy.server</span></code>
+      <code><span class="out">agentwell v0.1.2 · upstream: groq · session: a3f9...</span></code>
+      <code>&nbsp;</code>
+      <code><span class="out">task  1  │ </span><span class="health-ok">health=95</span><span class="out">  flags=none        tokens=42</span></code>
+      <code><span class="out">task 18  │ </span><span class="health-warn">health=61</span><span class="out">  flags=</span><span class="flag">repetition_high</span><span class="out">  tokens=38</span></code>
+      <code><span class="out">task 35  │ </span><span class="health-crit">health=38</span><span class="out">  flags=</span><span class="flag">quality_critical</span><span class="out"> tokens=21</span></code>
+      <code>&nbsp;</code>
+      <code><span class="out">⚠  health below threshold (70) — escalate to human</span></code>
+    </div>
+  </div>
+</div>
+
+<!-- SIGNALS -->
+<section id="signals">
+  <div class="section-label">What we detect</div>
+  <h2>Behavioral signals, not content</h2>
+  <p class="lead">
+    agentwell scores health from metadata only — token counts, timing, response patterns.
+    No prompt or response text is ever stored or transmitted.
+  </p>
+
+  <div class="signal-grid">
+    <div class="signal-card">
+      <div class="signal-icon">⟳</div>
+      <div class="signal-title">Repetition Ratio</div>
+      <div class="signal-desc">Cosine similarity across rolling prompt window. Catches grinding loops before output quality collapses.</div>
+    </div>
+    <div class="signal-card">
+      <div class="signal-icon">↘</div>
+      <div class="signal-title">Quality Degradation</div>
+      <div class="signal-desc">Token count trend + finish_reason tracking. Detects when an agent starts producing shorter, lower-effort responses.</div>
+    </div>
+    <div class="signal-card">
+      <div class="signal-icon">⇄</div>
+      <div class="signal-title">Behavioral Drift</div>
+      <div class="signal-desc">Sentiment polarity delta across session. Surfaces ideological drift and tone shift over long workloads.</div>
+    </div>
+    <div class="signal-card">
+      <div class="signal-icon">⚡</div>
+      <div class="signal-title">Coordination Signals</div>
+      <div class="signal-desc">Message structure + keyword scan. Detects agent-to-agent coordination patterns emerging under sustained pressure.</div>
+    </div>
+    <div class="signal-card">
+      <div class="signal-icon">🛡</div>
+      <div class="signal-title">Injection Blocking</div>
+      <div class="signal-desc">20+ injection patterns blocked at user-role boundary before any monitor analysis runs.</div>
+    </div>
+    <div class="signal-card">
+      <div class="signal-icon">🔒</div>
+      <div class="signal-title">Secret Redaction</div>
+      <div class="signal-desc">Log redactor strips API keys, tokens, and credentials from all output at the handler level.</div>
+    </div>
+  </div>
+</section>
+
+<!-- HEALTH SCORE -->
+<section>
+  <div class="section-label">Health score</div>
+  <h2>Every request scored 0–100</h2>
+  <p class="lead">
+    agentwell adds <code>X-Agentwell-Health</code> to every response header.
+    Your agent code never changes — just read the header.
+  </p>
+
+  <table class="health-table">
+    <thead>
+      <tr>
+        <th>Score</th>
+        <th>Status</th>
+        <th>Recommended action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="color: var(--green)">80 – 100</td>
+        <td>Healthy</td>
+        <td>Normal operation</td>
+      </tr>
+      <tr>
+        <td style="color: #86efac">60 – 79</td>
+        <td>Watch</td>
+        <td>Early signals — monitor closely</td>
+      </tr>
+      <tr>
+        <td style="color: var(--amber)">40 – 59</td>
+        <td>Warning</td>
+        <td>Degradation detected — human review recommended</td>
+      </tr>
+      <tr>
+        <td style="color: var(--red)">0 – 39</td>
+        <td>Critical</td>
+        <td>Significant shift — escalate to human now</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="privacy-banner" style="margin-top: 32px;">
+    <strong>Privacy guarantee:</strong> agentwell sees patterns, not content.
+    No prompt text, no response text, no embeddings stored by default.
+    The DB schema has no column for content — impossible to store accidentally.
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="section-label">Architecture</div>
+  <h2>One line change. Full visibility.</h2>
+  <p class="lead">
+    Point your agent at agentwell instead of your upstream.
+    agentwell proxies every call unmodified and adds health headers on the way back.
+  </p>
+
+  <div class="arch">
+    <div class="arch-row">
+      <div class="arch-box">Your Agent Code</div>
+      <div class="arch-arrow">↓</div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-box hl">agentwell proxy :3001</div>
+      <div class="arch-note">← behavioral health + security guard</div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-arrow">↓</div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-box">AGENTWELL_UPSTREAM</div>
+      <div class="arch-note">← any OpenAI-compatible endpoint</div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-arrow">↓</div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-box">Claude / GPT / Gemini / Llama / Ollama</div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK START -->
+<section id="start">
+  <div class="section-label">Quick start</div>
+  <h2>Running in under 5 minutes</h2>
+  <p class="lead">Works with Groq free tier — no credit card, $0 to start.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Clone and install</div>
+        <div class="code-block">
+          <span class="prompt">$</span> git clone https://github.com/flowmindlabs/agentwell<br>
+          <span class="prompt">$</span> cd agentwell<br>
+          <span class="prompt">$</span> pip install -r requirements.txt
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Configure upstream</div>
+        <div class="code-block">
+          <span class="prompt">$</span> cp .env.example .env<br>
+          <span class="comment"># set AGENTWELL_UPSTREAM and GROQ_API_KEY in .env</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Start the proxy</div>
+        <div class="code-block">
+          <span class="prompt">$</span> python -m agentwell.proxy.server<br>
+          <span class="comment"># agentwell now listening on localhost:3001</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Point your agent at agentwell</div>
+        <div class="code-block">
+          <span class="comment"># change this one line in your agent code</span><br>
+          base_url = <span style="color:var(--green)">"http://localhost:3001/v1"</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Read health on every response</div>
+        <div class="code-block">
+          health = response.headers[<span style="color:var(--green)">"x-agentwell-health"</span>]<br>
+          flags  = response.headers[<span style="color:var(--green)">"x-agentwell-flags"</span>]
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <h2>Start monitoring your agents today</h2>
+  <p>Open source · MIT license · $0 · No vendor lock-in</p>
+  <div class="btn-group">
+    <a href="https://github.com/flowmindlabs/agentwell" target="_blank" class="btn btn-primary">
+      View on GitHub
+    </a>
+    <a href="https://github.com/flowmindlabs/agentwell/blob/main/docs/testing/TESTING_REPORT.md" target="_blank" class="btn btn-secondary">
+      Read the test report
+    </a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <span>agentwell — open source behavioral health for AI agents</span>
+  <span>
+    Built by <a href="https://github.com/flowmindlabs" target="_blank">FlowMind Labs</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/flowmindlabs/agentwell" target="_blank">GitHub</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/flowmindlabs/agentwell/blob/main/LICENSE" target="_blank">MIT License</a>
+  </span>
+</footer>
+
+</body>
+</html>
