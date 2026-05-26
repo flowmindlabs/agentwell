@@ -16,7 +16,7 @@ dependencies = [
     "sentence-transformers==3.4.1",
     "vaderSentiment==3.3.2",
     "aiosqlite==0.21.0",
-    "python-dotenv==1.1.1",
+    "python-dotenv==1.2.2",
     "streamlit==1.54.0",
     "numpy>=1.24,<3.0",
     "pandas>=2.0,<3.0",
