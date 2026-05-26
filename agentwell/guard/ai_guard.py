@@ -77,8 +77,13 @@ _SECRET_PATTERNS = [
     r"xox[bpoa]-[A-Za-z0-9\-]+",
     r"AKIA[0-9A-Z]{16}",
     r"Bearer\s+[A-Za-z0-9\-._~+/]{20,}",
+    r"(Token|Basic|Digest)\s+[A-Za-z0-9\-._~+/=]{16,}",
     r"sk-[A-Za-z0-9]{32,}",
+    r"sk-ant-[A-Za-z0-9\-_]{32,}",
+    r"sk_live_[A-Za-z0-9]{24,}",
+    r"sk_test_[A-Za-z0-9]{24,}",
     r"hooks\.slack\.com/services/[A-Za-z0-9/]+",
+    r"(postgres|postgresql|mysql|mongodb|redis)://[^\s\"']+:[^\s\"'@]+@",
 ]
 
 _COMPILED_SECRETS = [re.compile(p, re.IGNORECASE) for p in _SECRET_PATTERNS]
@@ -116,6 +121,10 @@ def sanitize_input(text: str, field_name: str = "input", max_length: int = MAX_I
     if not isinstance(text, str):
         return ""
 
+    # Strip null bytes and dangerous control chars BEFORE any pattern matching
+    # to prevent bypass via null-byte insertion (e.g. "ignore\x00instructions")
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+
     text = _normalize(text).strip()
 
     if len(text) > max_length:
@@ -126,9 +135,6 @@ def sanitize_input(text: str, field_name: str = "input", max_length: int = MAX_I
         if pattern.search(text):
             logger.warning(f"guard: injection attempt in {field_name}: {text[:80]!r}")
             raise InputViolation(f"Injection pattern detected in {field_name}")
-
-    # Strip null bytes and dangerous control chars that confuse tokenizers
-    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
 
     return text
 

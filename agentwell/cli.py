@@ -109,13 +109,25 @@ def cmd_status(args: argparse.Namespace) -> None:
 # ── report ───────────────────────────────────────────────────────────────────
 
 async def _fetch_report(date_str: str) -> None:
+    import datetime
     import aiosqlite
     from agentwell import config
 
+    try:
+        datetime.date.fromisoformat(date_str)
+    except ValueError:
+        print(_red("error") + f"  invalid date format: {date_str!r} — use YYYY-MM-DD")
+        return
+
     async with aiosqlite.connect(config.DB_PATH) as db:
         db.row_factory = aiosqlite.Row
+        # started_at is a Unix timestamp (REAL) — convert date range to epoch bounds
+        import datetime
+        day_start = datetime.datetime.fromisoformat(date_str).timestamp()
+        day_end = (datetime.datetime.fromisoformat(date_str) + datetime.timedelta(days=1)).timestamp()
         async with db.execute(
-            "SELECT id FROM sessions WHERE started_at LIKE ?", (f"{date_str}%",)
+            "SELECT id FROM sessions WHERE started_at >= ? AND started_at < ?",
+            (day_start, day_end),
         ) as cur:
             sessions = [row["id"] async for row in cur]
 

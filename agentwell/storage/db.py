@@ -1,5 +1,6 @@
 import time
 import uuid
+import urllib.parse
 import aiosqlite
 from agentwell.config import DB_PATH
 
@@ -44,11 +45,14 @@ async def init_db() -> None:
 
 
 async def create_session(upstream_url: str, adapter_type: str) -> str:
+    # Strip query params — they may contain embedded API keys
+    parsed = urllib.parse.urlparse(upstream_url)
+    safe_url = parsed._replace(query="", fragment="").geturl()
     session_id = str(uuid.uuid4())
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "INSERT INTO sessions VALUES (?, ?, ?, ?)",
-            (session_id, time.time(), upstream_url, adapter_type),
+            (session_id, time.time(), safe_url, adapter_type),
         )
         await db.commit()
     return session_id
