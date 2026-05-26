@@ -49,14 +49,17 @@ PyPI packages execute malicious code on import. npm uses postinstall hooks.
 - `sui-move-build-helper`
 - `sui-sdk-build-utils`
 
-## Other Known Bad Packages
+## Other Known Bad Packages — Older Incidents (now fixed)
 
-| Package | Ecosystem | Issue |
-|---|---|---|
-| `litellm` | PyPI | TeamPCP backdoor in 1.82.7/1.82.8 — exfils secrets, systemd backdoor |
-| `sympy-dev` | PyPI | Typosquat of sympy — cryptominer |
-| `cline` | npm | Stolen token, malicious postinstall in 2.3.0 |
-| `axios` | npm | RAT via postinstall in 1.14.1 and 0.30.4 |
+These had confirmed vulnerabilities but have since been patched. Use the latest official version.
+Always verify on socket.dev before installing.
+
+| Package | Ecosystem | Issue | Status |
+|---|---|---|---|
+| `litellm` | PyPI | TeamPCP backdoor in 1.82.7/1.82.8 — exfils secrets, systemd backdoor | Fixed in later versions — use latest stable from pypi.org/project/litellm |
+| `sympy-dev` | PyPI | Typosquat of `sympy` — cryptominer | Use `sympy` (the real package), never `sympy-dev` |
+| `cline` | npm | Stolen token, malicious postinstall in 2.3.0 | Fixed in later versions — use latest stable from npmjs.com/package/cline |
+| `axios` | npm | RAT via postinstall in 1.14.1 and 0.30.4 | Fixed in later versions — use latest stable from npmjs.com/package/axios |
 
 ## Rule
 
