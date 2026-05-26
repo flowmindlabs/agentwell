@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "agentwell"
 version = "0.1.5"
 description = "Behavioral health layer for AI agents. Agents that work with humans, not around them."
-readme = "README.md"
+readme = "PYPI.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
