@@ -1,4 +1,4 @@
-# All versions pinned. Supply chain verified 2026-05-24.
+# All versions pinned. Supply chain verified 2026-05-26.
 # Before installing: grep packages-watch.md for each package name first.
 # Never run: pip install --upgrade (blindly)
 
@@ -8,9 +8,9 @@ httpx==0.28.1
 sentence-transformers==3.4.1
 vaderSentiment==3.3.2
 aiosqlite==0.21.0
-python-dotenv==1.1.0
-streamlit==1.45.1
+python-dotenv==1.1.1
+streamlit==1.46.1
 numpy>=1.24,<3.0
 pandas>=2.0,<3.0
-pytest==8.3.5
+pytest==8.4.2
 pytest-asyncio==0.25.3
