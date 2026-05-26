@@ -2,7 +2,7 @@
 
 > Agents that work with humans, not around them.
 
-![version](https://img.shields.io/badge/version-v0.1.4-4ade80?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-4ade80?style=flat-square) ![python](https://img.shields.io/badge/python-3.10+-4ade80?style=flat-square)
+![version](https://img.shields.io/badge/version-v0.1.5-4ade80?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-4ade80?style=flat-square) ![python](https://img.shields.io/badge/python-3.10+-4ade80?style=flat-square)
 
 agentwell is an open source behavioral health layer for AI agents. It sits as a transparent proxy between your agent code and any LLM upstream — detecting drift, quality degradation, and emergent coordination before they affect your system.
 
